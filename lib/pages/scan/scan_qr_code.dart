@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:qr_code_scanner/qr_code_scanner.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
 class ScanQrCode extends StatefulWidget {
   const ScanQrCode({super.key});
@@ -9,13 +9,41 @@ class ScanQrCode extends StatefulWidget {
 }
 
 class _ScanQrCodeState extends State<ScanQrCode> {
-  final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
-  QRViewController? controller;
-  String? result;
+  String? scannedResult;
+  bool isScanned = false;
+  final MobileScannerController _controller = MobileScannerController();
+
+  void _onDetect(BarcodeCapture capture) {
+    final Barcode? barcode = capture.barcodes.first;
+    if (!isScanned && barcode?.rawValue != null) {
+      setState(() {
+        scannedResult = barcode!.rawValue;
+        isScanned = true;
+      });
+
+      _controller.stop();
+
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text("QR Code Found"),
+          content: Text(scannedResult!),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); 
+              },
+              child: const Text("OK"),
+            ),
+          ],
+        ),
+      );
+    }
+  }
 
   @override
   void dispose() {
-    controller?.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
@@ -23,43 +51,33 @@ class _ScanQrCodeState extends State<ScanQrCode> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          onPressed: () {
-            Navigator.of(context).pop();
-          },
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-        ),
-        title: const Text(
-          "Scan QR Code",
-          style: TextStyle(color: Colors.white),
-        ),
+        title: const Text("Scan QR Code"),
         backgroundColor: Colors.black,
-        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: Column(
-        children: <Widget>[
+        children: [
           Expanded(
             flex: 5,
-            child: QRView(key: qrKey, onQRViewCreated: _onQRViewCreated),
+            child: MobileScanner(
+              controller: _controller,
+              onDetect: _onDetect,
+            ),
           ),
           Expanded(
             flex: 1,
             child: Center(
-              child: Text(result != null ? 'Result: $result' : 'Scan a code'),
+              child: Text(
+                scannedResult != null ? 'Result: $scannedResult' : 'Scan a QR Code',
+                style: const TextStyle(fontSize: 16),
+              ),
             ),
           ),
         ],
       ),
     );
-  }
-
-  void _onQRViewCreated(QRViewController controller) {
-    this.controller = controller;
-    controller.scannedDataStream.listen((scanData) {
-      controller.pauseCamera();
-      setState(() {
-        result = scanData.code;
-      });
-    });
   }
 }
